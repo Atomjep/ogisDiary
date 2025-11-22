@@ -144,7 +144,7 @@ function summarizeWeekly() {
   var data = {
     "model": model,
     "messages": [
-      { "role": "user", "content": prompt }
+      { "role": "user", "content": prompt + "\n\n出力はHTML形式で行ってください。見出しやリストを使って見やすく整形してください。" }
     ],
     "temperature": 0.5,
     "max_tokens": 2048
@@ -163,7 +163,8 @@ function summarizeWeekly() {
     var generatedText = json.choices[0].message.content;
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Weekly");
     sheet.getRange("C2").setValue(generatedText);
-    MailApp.sendEmail(userEmail, `${lastMonday.toLocaleDateString('ja-JP')}`+"~"+`${lastSunday.toLocaleDateString('ja-JP')}`+"までの1週間振り返り", generatedText);
+    var subject = `${lastMonday.toLocaleDateString('ja-JP')}`+"~"+`${lastSunday.toLocaleDateString('ja-JP')}`+"までの1週間振り返り";
+    sendEmail(generatedText, userEmail, subject, "kouta.ogihara@gmail.com", true);
   } else {
     sheet.getRange("C2").setValue("エラー: " + JSON.stringify(json));
   }
@@ -260,7 +261,7 @@ function makeDiaryPrompt(date, days = null) {
   return resultObject;
 }
 
-function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from = "kouta.ogihara@gmail.com") {
+function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from = "kouta.ogihara@gmail.com", isHtml = false) {
   try {
     // 入力値の検証
     if (!to || !body) {
@@ -272,10 +273,21 @@ function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from =
     if (!emailPattern.test(to)) {
       throw new Error("有効なメールアドレスを入力してください");
     }
+
+    // HTMLテンプレートを読み込み
+    const template = HtmlService.createTemplateFromFile('email_template');
+    
+    // テンプレート変数を設定
+    // isHtmlがtrueの場合はそのまま、falseの場合は改行を<br>に変換
+    template.body = isHtml ? body : body.replace(/\n/g, '<br>');
+    template.subject = subject;
+    
+    // HTMLを生成
+    const htmlBody = template.evaluate().getContent();
     
     // メール送信のオプション
     const options = {
-      htmlBody: body.replace(/\n/g, '<br>'), // 改行をHTMLの改行に変換
+      htmlBody: htmlBody,
     };
     
     // 送信者が指定されている場合は追加
@@ -284,7 +296,7 @@ function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from =
     }
     
     // メール送信
-    MailApp.sendEmail(to, subject, body, options);
+    MailApp.sendEmail(to, subject, "", options); // body引数は空にしてoptions.htmlBodyを使用
     
     console.log(`メール送信完了: ${to}`);
     return { success: true, message: "メール送信完了" };
@@ -293,6 +305,22 @@ function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from =
     console.error("メール送信エラー:", error.message);
     return { success: false, message: error.message };
   }
+}
+
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('GAS実行')
+      .addItem('今日のセルに移動', 'fcToday')
+      .addItem('サマリメール送信', 'summarizeWeekly')
+      .addToUi();
+}
+
+function testSendEmail() {
+  sendEmail(
+    "これはHTMLメールのテストです。\n\n改行も\n反映されますか？\n<b>太字</b>も使えるはずです。", 
+    "kouta.ogihara@gmail.com", 
+    "HTMLメールテスト"
+  );
 }
 
 
