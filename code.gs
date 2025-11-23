@@ -10,7 +10,7 @@ function rand() {
 
     rand = Math.random();
     rand = Math.floor(rand*365)+1;
-    Logger.log(rand);
+    Logger.log(rand); 
 
     if(rand != 0)
     ogiRange = sheet.getRange(rand,3);
