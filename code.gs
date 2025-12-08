@@ -1,24 +1,9 @@
-function rand() {
-  
-  var activeSpreadSheet = SpreadsheetApp.getActiveSpreadsheet(); // 現在のSpreadSheetを取得
-  var sheet=activeSpreadSheet.getSheetByName('日記'); // シート(SpreadSheetの下のタブ名を指定)
-
-  var ogiRange = sheet.getRange("A1");
-  var rand = 0;
-
-  while(rand == 0){// 指定するセルナンバーが０となった時は繰り返し
-
-    rand = Math.random();
-    rand = Math.floor(rand*365)+1;
-    Logger.log(rand); 
-
-    if(rand != 0)
-    ogiRange = sheet.getRange(rand,3);
-
-  }
-  
-  var sheet=activeSpreadSheet.getSheetByName('ランダム表示'); // シート(SpreadSheetの下のタブ名を指定)
-  sheet.getRange(3,2).setValue(rand-1);
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('GAS実行')
+      .addItem('今日のセルに移動', 'fcToday')
+      .addItem('サマリメール送信', 'summarizeWeekly')
+      .addToUi();
 }
 
 function fcToday() {
@@ -35,7 +20,7 @@ function fcToday() {
   // mm/dd の文字列を生成する。
   var ogitoday = mon +"/" + d2;
 
-  // Logger.log(ogitoday);
+
   
   var sheet=SpreadsheetApp.getActiveSheet();
 
@@ -52,6 +37,14 @@ function fcToday() {
   sheet.getRange(i + 2,y).activateAsCurrentCell()
 }
 
+function testSendEmail() {
+  sendEmail(
+    "これはHTMLメールのテストです。\n\n改行も\n反映されますか？\n<b>太字</b>も使えるはずです。", 
+    "kouta.ogihara@gmail.com", 
+    "HTMLメールテスト"
+  );
+}
+
 function summarizeMonthly() {
   const today = new Date();
   var api_key = PropertiesService.getScriptProperties().getProperty('APIKEY'); 
@@ -66,7 +59,7 @@ function summarizeMonthly() {
   // 最初の指示
   var promptCell 
   = "以下に続く日記の内容から1ヶ月を整理して振り返ってください。\n" +
-    + "最後に総括として私に対してやる気の出るコメントも添えてください\n"; 
+    "最後に総括として私に対してやる気の出るコメントも添えてください\n"; 
   
   const result = makeDiaryPrompt(today);
   //日記が半分以上記入されていなかったら｢入力日記数不足｣と表示する。
@@ -121,12 +114,7 @@ function summarizeWeekly() {
 
   const sheetMemo = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('memo');
   var promptCell = sheetMemo.getRange("B2").getValue();
-  // 最初の指示
-  // var promptCell 
-  // = "##指示\n" +
-  //   "あなたはGROWモデルを完全に習得したキャリアコーチです。またITコンサルタントおよび健康管理の専門家でもあります。\n" +
-  //   "私の今週1週間の日記の内容からGROWモデルをもとにしてアドバイスをしてください。\n" +
-  //   "回答は1200文字程度で構造的に記載して、マークダウン記法を使用しないでください。\n\n##日記\n" ; 
+ 
   
   const result = makeDiaryPrompt(lastMonday, 7);
   //日記が半分以上記入されていなかったら｢入力日記数不足｣と表示する。
@@ -170,6 +158,8 @@ function summarizeWeekly() {
   }
 
 }
+
+
 
 //最も近い日曜日を取得する。
 function getLastSunday() {
@@ -261,7 +251,7 @@ function makeDiaryPrompt(date, days = null) {
   return resultObject;
 }
 
-function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from = "kouta.ogihara@gmail.com", isHtml = false) {
+function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from = "kouta.ogihara@gmail.com") {
   try {
     // 入力値の検証
     if (!to || !body) {
@@ -278,8 +268,8 @@ function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from =
     const template = HtmlService.createTemplateFromFile('email_template');
     
     // テンプレート変数を設定
-    // isHtmlがtrueの場合はそのまま、falseの場合は改行を<br>に変換
-    template.body = isHtml ? body : body.replace(/\n/g, '<br>');
+    // 改行を<br>に変換してHTMLとして安全に埋め込む
+    template.body = body.replace(/\n/g, '<br>');
     template.subject = subject;
     
     // HTMLを生成
@@ -305,22 +295,6 @@ function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from =
     console.error("メール送信エラー:", error.message);
     return { success: false, message: error.message };
   }
-}
-
-function onOpen() {
-  var ui = SpreadsheetApp.getUi();
-  ui.createMenu('GAS実行')
-      .addItem('今日のセルに移動', 'fcToday')
-      .addItem('サマリメール送信', 'summarizeWeekly')
-      .addToUi();
-}
-
-function testSendEmail() {
-  sendEmail(
-    "これはHTMLメールのテストです。\n\n改行も\n反映されますか？\n<b>太字</b>も使えるはずです。", 
-    "kouta.ogihara@gmail.com", 
-    "HTMLメールテスト"
-  );
 }
 
 
