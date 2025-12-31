@@ -1,4 +1,4 @@
-function onOpen() {
+﻿function onOpen() {
   var ui = SpreadsheetApp.getUi();
   ui.createMenu('GAS実行')
       .addItem('今日のセルに移動', 'fcToday')
@@ -47,7 +47,7 @@ function testSendEmail() {
 
 function summarizeMonthly() {
   const today = new Date();
-  var api_key = PropertiesService.getScriptProperties().getProperty('APIKEY'); 
+  var api_key = PropertiesService.getScriptProperties().getProperty('QWEN_API_KEY'); 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Monthly"); // Monthlyシートを指定
   sheet.insertRowBefore(2); //ヘッダーのすぐ下に行を追加する
   
@@ -69,7 +69,7 @@ function summarizeMonthly() {
   }
 
   var prompt = promptCell + result.prompt //前月の1ヶ月分の日記情報を取得する。
-  var model = "gpt-4.1-nano"; // 使用するOpenAIモデルのID
+  var model = "qwen/qwen2.5-vl-72b-instruct"; // 使用するOpenAIモデルのID
   var headers = {
     "Authorization": "Bearer " + api_key,
     "Content-Type": "application/json"
@@ -90,7 +90,7 @@ function summarizeMonthly() {
     "muteHttpExceptions": true // エラー原因特定のため
   };
 
-  var response = UrlFetchApp.fetch("https://api.openai.com/v1/chat/completions", options);
+  var response = UrlFetchApp.fetch("https://api.novita.ai/v3/openai/chat/completions", options);
   var json = JSON.parse(response.getContentText());
   if (json.choices && json.choices.length > 0) {
     var generatedText = json.choices[0].message.content;
@@ -106,7 +106,7 @@ function summarizeWeekly() {
   const lastMonday = new Date(lastSunday);
   
   lastMonday.setDate(lastSunday.getDate() - 6);
-  var api_key = PropertiesService.getScriptProperties().getProperty('APIKEY'); 
+  var api_key = PropertiesService.getScriptProperties().getProperty('QWEN_API_KEY'); 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Weekly"); // Weeklyシートを指定
   sheet.insertRowBefore(2); //ヘッダーのすぐ下に行を追加する
   sheet.getRange("A2").setValue(`${lastMonday.toLocaleDateString('ja-JP')}`);
@@ -124,7 +124,7 @@ function summarizeWeekly() {
   }
 
   var prompt = promptCell + result.prompt //7日分の日記データを取得する。
-  var model = "gpt-4.1-mini"; // 使用するOpenAIモデルのID
+  var model = "qwen/qwen2.5-vl-72b-instruct"; // 使用するOpenAIモデルのID
   var headers = {
     "Authorization": "Bearer " + api_key,
     "Content-Type": "application/json"
@@ -145,7 +145,7 @@ function summarizeWeekly() {
     "muteHttpExceptions": true // エラー原因特定のため
   };
   const userEmail = Session.getActiveUser().getEmail();
-  var response = UrlFetchApp.fetch("https://api.openai.com/v1/chat/completions", options);
+  var response = UrlFetchApp.fetch("https://api.novita.ai/v3/openai/chat/completions", options);
   var json = JSON.parse(response.getContentText());
   if (json.choices && json.choices.length > 0) {
     var generatedText = json.choices[0].message.content;
@@ -296,5 +296,6 @@ function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from =
     return { success: false, message: error.message };
   }
 }
+
 
 
