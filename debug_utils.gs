@@ -44,3 +44,46 @@ function testEndpoint(api_key, url, label) {
     Logger.log("Exception: " + e.toString());
   }
 }
+
+function debugGeminiConnection() {
+  var api_key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  
+  if (!api_key) {
+    Logger.log("ERROR: 'GEMINI_API_KEY' is not set in Script Properties.");
+    return;
+  }
+
+  Logger.log("API Key loaded: " + api_key.substring(0, 5) + "..." + api_key.substring(api_key.length - 4));
+  Logger.log("Key length: " + api_key.length);
+
+  testGeminiEndpoint(api_key);
+}
+
+function testGeminiEndpoint(api_key) {
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + api_key;
+  Logger.log("--- Testing Gemini 2.5 Pro Endpoint ---");
+  Logger.log("URL: " + url);
+
+  var data = {
+    "contents": [{
+      "parts": [{"text": "Hello"}]
+    }]
+  };
+
+  var options = {
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "payload": JSON.stringify(data),
+    "muteHttpExceptions": true
+  };
+
+  try {
+    var response = UrlFetchApp.fetch(url, options);
+    Logger.log("Response Code: " + response.getResponseCode());
+    Logger.log("Response Body: " + response.getContentText());
+  } catch (e) {
+    Logger.log("Exception: " + e.toString());
+  }
+}
