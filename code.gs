@@ -47,7 +47,7 @@ function testSendEmail() {
 
 function summarizeMonthly() {
   const today = new Date();
-  var api_key = PropertiesService.getScriptProperties().getProperty('QWEN_API_KEY'); 
+  var api_key = PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY'); 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Monthly"); // Monthlyシートを指定
   sheet.insertRowBefore(2); //ヘッダーのすぐ下に行を追加する
   
@@ -69,7 +69,7 @@ function summarizeMonthly() {
   }
 
   var prompt = promptCell + result.prompt //前月の1ヶ月分の日記情報を取得する。
-  var model = "qwen/qwen2.5-vl-72b-instruct"; // 使用するOpenAIモデルのID
+  var model = "deepseek-chat"; // 使用するOpenAIモデルのID
   var headers = {
     "Authorization": "Bearer " + api_key,
     "Content-Type": "application/json"
@@ -90,7 +90,7 @@ function summarizeMonthly() {
     "muteHttpExceptions": true // エラー原因特定のため
   };
 
-  var response = UrlFetchApp.fetch("https://api.novita.ai/v3/openai/chat/completions", options);
+  var response = UrlFetchApp.fetch("https://api.deepseek.com/v1/chat/completions", options);
   var json = JSON.parse(response.getContentText());
   if (json.choices && json.choices.length > 0) {
     var generatedText = json.choices[0].message.content;
@@ -124,7 +124,7 @@ function summarizeWeekly() {
   }
 
   var prompt = promptCell + result.prompt //7日分の日記データを取得する。
-  var model = "qwen/qwen2.5-vl-72b-instruct"; // 使用するOpenAIモデルのID
+  var model = "qwen/qwen3-max"; // 使用するAIモデルのID
   var headers = {
     "Authorization": "Bearer " + api_key,
     "Content-Type": "application/json"
@@ -288,11 +288,11 @@ function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from =
     // メール送信
     MailApp.sendEmail(to, subject, "", options); // body引数は空にしてoptions.htmlBodyを使用
     
-    console.log(`メール送信完了: ${to}`);
+    Logger.log(`メール送信完了: ${to}`);
     return { success: true, message: "メール送信完了" };
     
   } catch (error) {
-    console.error("メール送信エラー:", error.message);
+    Logger.log("メール送信エラー:", error.message);
     return { success: false, message: error.message };
   }
 }
