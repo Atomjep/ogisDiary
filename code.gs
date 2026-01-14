@@ -2,40 +2,11 @@
   var ui = SpreadsheetApp.getUi();
   ui.createMenu('GAS実行')
       .addItem('今日のセルに移動', 'fcToday')
-      .addItem('サマリメール送信', 'summarizeWeekly')
+      .addItem('サマリメール送信 (OpenAI)', 'summarizeWeekly')
+      .addItem('サマリメール送信 (Gemini)', 'summarizeWeeklyGemini')
       .addToUi();
 }
 
-function fcToday() {
-  /*Dateオブジェクトで取得した日付をdに代入*/
-  var d = new Date(); 
-
-  // 2025年は5列目
-  var y = 5 
-
- // dから月と日だけを抽出する。
-  var mon = d.getMonth() + 1;
-  var d2 = d.getDate();
-
-  // mm/dd の文字列を生成する。
-  var ogitoday = mon +"/" + d2;
-
-
-  
-  var sheet=SpreadsheetApp.getActiveSheet();
-
-  // B列の文字列を配列に格納する。
-  let value=sheet.getRange("B2:B366").getValues();
-
-  // 今日の日付と一致する要素番号を探す。
-  var i = 0;
-  while(value[i] != ogitoday){
-    i++;
-  }
-
-  // 今日のセルへ移動
-  sheet.getRange(i + 2,y).activateAsCurrentCell()
-}
 
 function testSendEmail() {
   sendEmail(
@@ -47,7 +18,7 @@ function testSendEmail() {
 
 function summarizeMonthly() {
   const today = new Date();
-  var api_key = PropertiesService.getScriptProperties().getProperty('QWEN_API_KEY'); 
+  var api_key = PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY'); 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Monthly"); // Monthlyシートを指定
   sheet.insertRowBefore(2); //ヘッダーのすぐ下に行を追加する
   
@@ -69,7 +40,7 @@ function summarizeMonthly() {
   }
 
   var prompt = promptCell + result.prompt //前月の1ヶ月分の日記情報を取得する。
-  var model = "qwen/qwen2.5-vl-72b-instruct"; // 使用するOpenAIモデルのID
+  var model = "deepseek-chat"; // 使用するOpenAIモデルのID
   var headers = {
     "Authorization": "Bearer " + api_key,
     "Content-Type": "application/json"
@@ -90,7 +61,7 @@ function summarizeMonthly() {
     "muteHttpExceptions": true // エラー原因特定のため
   };
 
-  var response = UrlFetchApp.fetch("https://api.novita.ai/v3/openai/chat/completions", options);
+  var response = UrlFetchApp.fetch("https://api.deepseek.com/v1/chat/completions", options);
   var json = JSON.parse(response.getContentText());
   if (json.choices && json.choices.length > 0) {
     var generatedText = json.choices[0].message.content;
@@ -102,11 +73,19 @@ function summarizeMonthly() {
 }
 
 function summarizeWeekly() {
+  runWeeklySummary('openai');
+}
+
+function summarizeWeeklyGemini() {
+  runWeeklySummary('gemini');
+}
+
+function runWeeklySummary(modelType) {
   const lastSunday = getLastSunday();
   const lastMonday = new Date(lastSunday);
   
   lastMonday.setDate(lastSunday.getDate() - 6);
-  var api_key = PropertiesService.getScriptProperties().getProperty('QWEN_API_KEY'); 
+  
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Weekly"); // Weeklyシートを指定
   sheet.insertRowBefore(2); //ヘッダーのすぐ下に行を追加する
   sheet.getRange("A2").setValue(`${lastMonday.toLocaleDateString('ja-JP')}`);
@@ -114,7 +93,6 @@ function summarizeWeekly() {
 
   const sheetMemo = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('memo');
   var promptCell = sheetMemo.getRange("B2").getValue();
- 
   
   const result = makeDiaryPrompt(lastMonday, 7);
   //日記が半分以上記入されていなかったら｢入力日記数不足｣と表示する。
@@ -124,7 +102,33 @@ function summarizeWeekly() {
   }
 
   var prompt = promptCell + result.prompt //7日分の日記データを取得する。
-  var model = "qwen/qwen2.5-vl-72b-instruct"; // 使用するOpenAIモデルのID
+  var generatedText = "";
+  var instructions = "出力はHTML形式で行ってください。見出しやリストを使って見やすく整形してください。";
+  var modelName = "";
+
+  if (modelType === 'gemini') {
+    modelName = "gemini-2.5-flash";
+    generatedText = callGeminiAPI(prompt, instructions);
+  } else {
+    // Default to OpenAI/Qwen
+    modelName = "qwen/qwen3-max";
+    generatedText = callOpenAIAPI(prompt, instructions);
+  }
+
+  if (generatedText && !generatedText.startsWith("エラー:")) {
+    var finalText = "使用モデル: " + modelName + "\n\n" + generatedText;
+    sheet.getRange("C2").setValue(finalText);
+    const userEmail = Session.getActiveUser().getEmail();
+    var subject = `${lastMonday.toLocaleDateString('ja-JP')}`+"~"+`${lastSunday.toLocaleDateString('ja-JP')}`+"までの1週間振り返り";
+    sendEmail(finalText, userEmail, subject, "kouta.ogihara@gmail.com", true);
+  } else {
+    sheet.getRange("C2").setValue(generatedText);
+  }
+}
+
+function callOpenAIAPI(prompt, instructions) {
+  var api_key = PropertiesService.getScriptProperties().getProperty('QWEN_API_KEY');
+  var model = "qwen/qwen3-max"; // 使用するAIモデルのID
   var headers = {
     "Authorization": "Bearer " + api_key,
     "Content-Type": "application/json"
@@ -132,7 +136,7 @@ function summarizeWeekly() {
   var data = {
     "model": model,
     "messages": [
-      { "role": "user", "content": prompt + "\n\n出力はHTML形式で行ってください。見出しやリストを使って見やすく整形してください。" }
+      { "role": "user", "content": prompt + "\n\n" + instructions }
     ],
     "temperature": 0.5,
     "max_tokens": 2048
@@ -144,26 +148,61 @@ function summarizeWeekly() {
     "payload": JSON.stringify(data),
     "muteHttpExceptions": true // エラー原因特定のため
   };
-  const userEmail = Session.getActiveUser().getEmail();
-  var response = UrlFetchApp.fetch("https://api.novita.ai/v3/openai/chat/completions", options);
-  var json = JSON.parse(response.getContentText());
-  if (json.choices && json.choices.length > 0) {
-    var generatedText = json.choices[0].message.content;
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Weekly");
-    sheet.getRange("C2").setValue(generatedText);
-    var subject = `${lastMonday.toLocaleDateString('ja-JP')}`+"~"+`${lastSunday.toLocaleDateString('ja-JP')}`+"までの1週間振り返り";
-    sendEmail(generatedText, userEmail, subject, "kouta.ogihara@gmail.com", true);
-  } else {
-    sheet.getRange("C2").setValue("エラー: " + JSON.stringify(json));
-  }
 
+  try {
+    var response = UrlFetchApp.fetch("https://api.novita.ai/v3/openai/chat/completions", options);
+    var json = JSON.parse(response.getContentText());
+    if (json.choices && json.choices.length > 0) {
+      return json.choices[0].message.content;
+    } else {
+      return "エラー: " + JSON.stringify(json);
+    }
+  } catch (e) {
+    return "エラー: " + e.toString();
+  }
+}
+
+function callGeminiAPI(prompt, instructions) {
+  var api_key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + api_key;
+  
+  var data = {
+    "contents": [{
+      "parts": [{"text": prompt + "\n\n" + instructions}]
+    }],
+    "generationConfig": {
+        "temperature": 0.5
+    }
+  };
+
+  var options = {
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "payload": JSON.stringify(data),
+    "muteHttpExceptions": true
+  };
+
+  try {
+    var response = UrlFetchApp.fetch(url, options);
+    var json = JSON.parse(response.getContentText());
+    if (json.candidates && json.candidates.length > 0 && json.candidates[0].content && json.candidates[0].content.parts.length > 0) {
+      return json.candidates[0].content.parts[0].text;
+    } else {
+      return "エラー: " + JSON.stringify(json);
+    }
+  } catch (e) {
+    return "エラー: " + e.toString();
+  }
 }
 
 
 
 //最も近い日曜日を取得する。
 function getLastSunday() {
-  const today = new Date();
+  // const today = new Date();
+  const today = new Date("2026-01-07");
   
   // 今日の曜日を取得（0:日曜日, 1:月曜日, ..., 6:土曜日）
   const dayOfWeek = today.getDay();
@@ -210,9 +249,9 @@ function makeDiaryPrompt(date, days = null) {
   const dayOffset = Math.floor((startDate - startOfYear) / (1000 * 60 * 60 * 24));
   const targetRow = 2 + dayOffset;
 
-  // E列（列5）から指定日数分のデータを取得
+  // F列（列6）から指定日数分のデータを取得
   const contents = sheet
-    .getRange(targetRow, 5, daysToRetrieve, 1)
+    .getRange(targetRow, 6, daysToRetrieve, 1)
     .getValues(); // 二次元配列 [ [内容], [内容], ... ]
 
   // 入力のあるセル数をカウント（空文字列、null、undefinedでない場合）
@@ -288,11 +327,11 @@ function sendEmail(body="test", to="atomjep@gmail.com", subject = "test", from =
     // メール送信
     MailApp.sendEmail(to, subject, "", options); // body引数は空にしてoptions.htmlBodyを使用
     
-    console.log(`メール送信完了: ${to}`);
+    Logger.log(`メール送信完了: ${to}`);
     return { success: true, message: "メール送信完了" };
     
   } catch (error) {
-    console.error("メール送信エラー:", error.message);
+    Logger.log("メール送信エラー:", error.message);
     return { success: false, message: error.message };
   }
 }
