@@ -1,16 +1,17 @@
 ﻿function debugDashScopeConnection() {
-  var api_key = PropertiesService.getScriptProperties().getProperty('QWEN_API_KEY');
+  var api_key = PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY');
   
   if (!api_key) {
-    Logger.log("ERROR: 'QWEN_API_KEY' is not set in Script Properties.");
+    Logger.log("ERROR: 'DEEPSEEK_API_KEY' is not set in Script Properties.");
     return;
   }
 
   Logger.log("API Key loaded: " + api_key.substring(0, 5) + "..." + api_key.substring(api_key.length - 4));
   Logger.log("Key length: " + api_key.length);
 
-  // Test International Endpoint
-  testEndpoint(api_key, "https://api.novita.ai/v3/openai/chat/completions", "Novita-ai");
+ 
+  testEndpoint(api_key, "https://api.deepseek.com/v1/chat/completions", "deepseek-chat");
+  // testEndpoint(api_key, "https://api.novita.ai/v3/openai/chat/completions", "Novita-ai");
 }
 
 function testEndpoint(api_key, url, label) {
@@ -23,13 +24,57 @@ function testEndpoint(api_key, url, label) {
   };
   
   var data = {
-    "model": "qwen/qwen2.5-vl-72b-instruct", // Qwen2.5-7B
+    "model": "deepseek-chat", // deepseek
+    // "model": "qwen/qwen3-max", // Qwen3
     "messages": [{ "role": "user", "content": "Hello" }]
   };
 
   var options = {
     "method": "POST",
     "headers": headers,
+    "payload": JSON.stringify(data),
+    "muteHttpExceptions": true
+  };
+
+  try {
+    var response = UrlFetchApp.fetch(url, options);
+    Logger.log("Response Code: " + response.getResponseCode());
+    Logger.log("Response Body: " + response.getContentText());
+  } catch (e) {
+    Logger.log("Exception: " + e.toString());
+  }
+}
+
+function debugGeminiConnection() {
+  var api_key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  
+  if (!api_key) {
+    Logger.log("ERROR: 'GEMINI_API_KEY' is not set in Script Properties.");
+    return;
+  }
+
+  Logger.log("API Key loaded: " + api_key.substring(0, 5) + "..." + api_key.substring(api_key.length - 4));
+  Logger.log("Key length: " + api_key.length);
+
+  testGeminiEndpoint(api_key);
+}
+
+function testGeminiEndpoint(api_key) {
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + api_key;
+  Logger.log("--- Testing Gemini 2.5 Pro Endpoint ---");
+  Logger.log("URL: " + url);
+
+  var data = {
+    "contents": [{
+      "parts": [{"text": "Hello"}]
+    }]
+  };
+
+  var options = {
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json"
+    },
     "payload": JSON.stringify(data),
     "muteHttpExceptions": true
   };
